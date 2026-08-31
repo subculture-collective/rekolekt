@@ -110,7 +110,7 @@ The blind worksheet is the quality decision. Automated grounding and shape metri
 
 ## Candidate generation with V4 Pro
 
-The production-facing enrichment path is deliberately review-only. It uses the pinned `deepseek/deepseek-v4-pro` model through OpenRouter, divides long episodes into balanced windows no longer than 90 minutes, and merges their chapter timelines and recurring labels. Categories are restricted to the existing archive allowlist, retain cited transcript evidence, and follow explicit definitions: named formats such as Chadvice and OKBuddy require that named segment, Gaming means video games rather than physical or table games, and broad categories must characterize a substantial portion of the episode. This avoids the oversized tail chapters found in the whole-episode bake-off without allowing free-form category growth.
+The production-facing enrichment path is deliberately review-only. It uses the pinned `deepseek/deepseek-v4-pro` model through OpenRouter, divides long episodes into balanced windows no longer than 90 minutes, and merges their chapter timelines and recurring labels. Categories are restricted to the existing archive allowlist, retain cited transcript evidence, and follow explicit definitions: named formats such as Chadvice and OKBuddy require that named segment, Gaming means video games rather than physical or table games, and broad categories must characterize a substantial portion of the episode. Unless supported by the video title, broad-category citations must span at least 20% of the episode timeline; filtered suggestions are counted in run metrics. This avoids the oversized tail chapters found in the whole-episode bake-off without allowing free-form category growth.
 
 Configure the ignored `.env` file:
 

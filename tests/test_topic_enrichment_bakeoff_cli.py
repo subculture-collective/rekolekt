@@ -96,6 +96,7 @@ def test_bakeoff_cli_writes_predictions_metrics_and_blind_review(tmp_path, monke
     assert report["models"]["model/one"]["first_boundary_normalizations"] == 1
     assert report["models"]["model/one"]["summaries_truncated"] == 1
     assert report["models"]["model/one"]["evidence_overlap_violations"] == 0
+    assert report["models"]["model/one"]["categories_dropped"] == 0
     predictions = json.loads((output_dir / "predictions-model-one.json").read_text())
     assert predictions["episodes"][0]["chapters"][-1]["end_ms"] == 1_200_000
     review = (output_dir / "blind-editorial-review.md").read_text()

@@ -15,7 +15,7 @@ from .enrichment_runner import EpisodeInput, TranscriptBlockInput
 from .labeling.benchmark import EpisodePrediction, PredictedChapter
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
-PROMPT_VERSION = "archive-episode-enrichment-v5"
+PROMPT_VERSION = "archive-episode-enrichment-v6"
 
 CATEGORY_LABELS: dict[str, str] = {
     "chadvice": "Chadvice",
@@ -179,6 +179,7 @@ class OpenRouterEpisodeResult(BaseModel):
     first_boundary_normalized: bool = False
     summaries_truncated: int = 0
     evidence_citations_trimmed: int = 0
+    categories_dropped: int = 0
     evidence_overlap_violations: int = 0
     window_count: int = 1
 
@@ -213,6 +214,7 @@ class OpenRouterEpisodeResult(BaseModel):
                 "first_boundary_to_zero": self.first_boundary_normalized,
                 "summaries_truncated": self.summaries_truncated,
                 "evidence_citations_trimmed": self.evidence_citations_trimmed,
+                "categories_dropped": self.categories_dropped,
             },
             "validation": {"evidence_overlap_violations": self.evidence_overlap_violations},
             "window_count": self.window_count,
@@ -317,6 +319,28 @@ def _validation_summary(exc: ValidationError) -> str:
     return "; ".join(messages)
 
 
+def _category_has_sustained_evidence(category: dict[str, Any], episode: EpisodeInput) -> bool:
+    slug = category.get("slug")
+    indexes = category.get("evidence_block_indexes")
+    if not isinstance(slug, str) or not isinstance(indexes, list):
+        return False
+    block_by_index = {block.block_index: block for block in episode.blocks}
+    if any(isinstance(index, int) and index not in block_by_index for index in indexes):
+        return True
+    blocks = [block_by_index[index] for index in indexes if isinstance(index, int) and index in block_by_index]
+    title = (episode.title or "").casefold()
+    if slug in {"chadvice", "okbuddy"}:
+        marker = CATEGORY_LABELS[slug].casefold()
+        evidence_text = " ".join(block.text for block in blocks).casefold()
+        return marker in title or marker in evidence_text
+    if CATEGORY_LABELS.get(slug, "").casefold() in title:
+        return True
+    if len(blocks) < 2:
+        return False
+    evidence_span_ms = max(block.start_ms for block in blocks) - min(block.start_ms for block in blocks)
+    return evidence_span_ms >= episode.duration_ms * 0.2
+
+
 def _parse_response(
     payload: dict[str, Any], episode: EpisodeInput, *, model: str, elapsed: float
 ) -> OpenRouterEpisodeResult:
@@ -350,6 +374,7 @@ def _parse_response(
     first_boundary_normalized = False
     summaries_truncated = 0
     evidence_citations_trimmed = 0
+    categories_dropped = 0
     if isinstance(raw_candidate, dict):
         chapters = raw_candidate.get("chapters")
         if isinstance(chapters, list) and chapters and isinstance(chapters[0], dict):
@@ -377,6 +402,13 @@ def _parse_response(
                 if isinstance(evidence, list) and len(evidence) > 3:
                     category["evidence_block_indexes"] = list(dict.fromkeys(evidence))[:3]
                     evidence_citations_trimmed += len(evidence) - len(category["evidence_block_indexes"])
+            retained_categories = [
+                category
+                for category in categories
+                if isinstance(category, dict) and _category_has_sustained_evidence(category, episode)
+            ]
+            categories_dropped = len(categories) - len(retained_categories)
+            raw_candidate["categories"] = retained_categories
     try:
         candidate = EpisodeEnrichmentCandidate.model_validate(raw_candidate)
     except ValidationError as exc:
@@ -414,6 +446,7 @@ def _parse_response(
         first_boundary_normalized=first_boundary_normalized,
         summaries_truncated=summaries_truncated,
         evidence_citations_trimmed=evidence_citations_trimmed,
+        categories_dropped=categories_dropped,
         evidence_overlap_violations=evidence_overlap_violations,
     )
 
@@ -582,6 +615,7 @@ def generate_hierarchical_openrouter_enrichment(
         first_boundary_normalized=any(result.first_boundary_normalized for _offset, result in window_results),
         summaries_truncated=sum(result.summaries_truncated for _offset, result in window_results),
         evidence_citations_trimmed=sum(result.evidence_citations_trimmed for _offset, result in window_results),
+        categories_dropped=sum(result.categories_dropped for _offset, result in window_results),
         evidence_overlap_violations=sum(result.evidence_overlap_violations for _offset, result in window_results),
         window_count=len(window_results),
     )

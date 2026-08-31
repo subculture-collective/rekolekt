@@ -349,6 +349,7 @@ def enrich_video_candidates(
                     "first_boundary_normalized": result.first_boundary_normalized,
                     "summaries_truncated": result.summaries_truncated,
                     "evidence_citations_trimmed": result.evidence_citations_trimmed,
+                    "categories_dropped": result.categories_dropped,
                     "evidence_overlap_violations": result.evidence_overlap_violations,
                 },
             }

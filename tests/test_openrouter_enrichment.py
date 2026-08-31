@@ -218,6 +218,26 @@ def test_generate_openrouter_enrichment_rejects_unknown_category_evidence(monkey
         generate_openrouter_episode_enrichment(_episode(), api_key="key", model="model")
 
 
+def test_generate_openrouter_enrichment_drops_category_without_sustained_evidence(monkeypatch):
+    payload = _response_payload()
+    parsed = json.loads(payload["choices"][0]["message"]["content"])
+    parsed["categories"] = [
+        {"slug": "gaming", "evidence_block_indexes": [0]},
+        {"slug": "politics", "evidence_block_indexes": [0, 1]},
+    ]
+    payload["choices"][0]["message"]["content"] = json.dumps(parsed)
+    monkeypatch.setattr(
+        "app.archive.openrouter_enrichment.request.urlopen",
+        lambda _req, timeout: _Response(payload),
+    )
+
+    result = generate_openrouter_episode_enrichment(_episode(), api_key="key", model="model")
+
+    assert [category.slug for category in result.candidate.categories] == ["politics"]
+    assert result.categories_dropped == 1
+    assert result.as_dict()["normalizations"]["categories_dropped"] == 1
+
+
 def test_generate_openrouter_enrichment_retries_transient_http_errors(monkeypatch):
     attempts = 0
 
