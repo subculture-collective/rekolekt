@@ -15,7 +15,7 @@ from .enrichment_runner import EpisodeInput, TranscriptBlockInput
 from .labeling.benchmark import EpisodePrediction, PredictedChapter
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
-PROMPT_VERSION = "archive-episode-enrichment-v4"
+PROMPT_VERSION = "archive-episode-enrichment-v5"
 
 CATEGORY_LABELS: dict[str, str] = {
     "chadvice": "Chadvice",
@@ -28,6 +28,18 @@ CATEGORY_LABELS: dict[str, str] = {
     "debate": "Debate",
     "interview": "Interview",
     "irl": "IRL",
+}
+CATEGORY_GUIDANCE: dict[str, str] = {
+    "chadvice": "Only the explicitly named recurring Chadvice advice segment; ordinary advice or relationship talk does not qualify.",
+    "okbuddy": "Only the explicitly named OKBuddy subreddit/reaction segment.",
+    "gaming": "Sustained video-game play or discussion; sports, billiards, and other physical/table games do not qualify.",
+    "guests": "One or more guests materially appear or participate in the stream; a person discussed but absent does not qualify.",
+    "news": "Sustained coverage of current news reporting or events, not a brief news tangent.",
+    "politics": "Sustained political analysis or political-event coverage, not a brief political tangent.",
+    "react": "Sustained viewing and commentary on external media, not ordinary conversation or chat responses.",
+    "debate": "A sustained adversarial debate between participants, not casual disagreement.",
+    "interview": "A sustained, structured interview with a guest, not ordinary guest conversation.",
+    "irl": "A substantial real-world, away-from-desk stream such as travel, events, venues, or street activity.",
 }
 
 EPISODE_ENRICHMENT_SCHEMA: dict[str, Any] = {
@@ -247,7 +259,9 @@ Prefer coherent editorial sections over brief conversational shifts. Merge adjac
 Titles must be specific, concise, safe to publish, and understandable without surrounding transcript text.
 Do not reproduce slurs, insults, profanity, sponsor copy, chat filler, or sentence fragments in titles.
 Subjects are the episode's sustained primary entities or issues. Keywords are specific phrases a user might search.
-Choose one to three categories only from the supplied controlled taxonomy. Cite blocks that directly support each category.
+Choose one to three episode-defining categories only from the supplied controlled taxonomy and definitions.
+A category must characterize a substantial portion of the episode; do not classify from a short tangent.
+Cite blocks from distinct parts of the episode that directly support each category when possible.
 Every chapter must cite one to three block indexes whose text directly demonstrates its subject.
 Return only JSON matching the supplied schema."""
     user = {
@@ -259,6 +273,7 @@ Return only JSON matching the supplied schema."""
         "transcript_selection_reason": episode.transcript_selection_reason,
         "target_chapter_count": target_count,
         "category_taxonomy": CATEGORY_LABELS,
+        "category_definitions": CATEGORY_GUIDANCE,
         "chapter_guidance": {
             "preferred_duration_minutes": "15-35",
             "first_start_ms": 0,
@@ -575,6 +590,7 @@ def generate_hierarchical_openrouter_enrichment(
 __all__ = [
     "EPISODE_ENRICHMENT_SCHEMA",
     "CATEGORY_LABELS",
+    "CATEGORY_GUIDANCE",
     "OPENROUTER_CHAT_URL",
     "PROMPT_VERSION",
     "EpisodeChapterCandidate",

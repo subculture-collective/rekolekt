@@ -108,6 +108,8 @@ def test_build_openrouter_request_uses_identical_strict_controls():
     user = json.loads(body["messages"][1]["content"])
     assert user["target_chapter_count"] == 6
     assert user["category_taxonomy"]["politics"] == "Politics"
+    assert "video-game" in user["category_definitions"]["gaming"]
+    assert "explicitly named" in user["category_definitions"]["chadvice"]
     assert user["transcript_blocks"][1]["block_index"] == 1
 
 
