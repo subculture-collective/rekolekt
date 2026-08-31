@@ -179,6 +179,23 @@ def test_generate_openrouter_enrichment_truncates_overlong_summaries(monkeypatch
     assert len(result.candidate.chapters[0].summary) <= 300
 
 
+def test_generate_openrouter_enrichment_trims_excess_evidence_citations(monkeypatch):
+    payload = _response_payload()
+    parsed = json.loads(payload["choices"][0]["message"]["content"])
+    parsed["chapters"][0]["evidence_block_indexes"] = [0, 1, 0, 1]
+    payload["choices"][0]["message"]["content"] = json.dumps(parsed)
+    monkeypatch.setattr(
+        "app.archive.openrouter_enrichment.request.urlopen",
+        lambda _req, timeout: _Response(payload),
+    )
+
+    result = generate_openrouter_episode_enrichment(_episode(), api_key="key", model="model")
+
+    assert result.candidate.chapters[0].evidence_block_indexes == [0, 1]
+    assert result.evidence_citations_trimmed == 2
+    assert result.as_dict()["normalizations"]["evidence_citations_trimmed"] == 2
+
+
 def test_generate_openrouter_enrichment_retries_transient_http_errors(monkeypatch):
     attempts = 0
 

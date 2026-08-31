@@ -303,6 +303,7 @@ def enrich_video_candidates(
                 "repairs": {
                     "first_boundary_normalized": result.first_boundary_normalized,
                     "summaries_truncated": result.summaries_truncated,
+                    "evidence_citations_trimmed": result.evidence_citations_trimmed,
                     "evidence_overlap_violations": result.evidence_overlap_violations,
                 },
             }

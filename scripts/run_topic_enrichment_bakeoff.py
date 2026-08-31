@@ -54,6 +54,7 @@ def _result_from_dict(payload: dict[str, Any]) -> OpenRouterEpisodeResult:
         elapsed_seconds=float(usage.get("elapsed_seconds") or 0.0),
         first_boundary_normalized=bool(normalizations.get("first_boundary_to_zero", False)),
         summaries_truncated=int(normalizations.get("summaries_truncated") or 0),
+        evidence_citations_trimmed=int(normalizations.get("evidence_citations_trimmed") or 0),
         evidence_overlap_violations=int(validation.get("evidence_overlap_violations") or 0),
     )
 
@@ -117,6 +118,7 @@ def _model_metrics(results: list[OpenRouterEpisodeResult], episodes: dict[str, E
         "mean_latency_seconds": round(statistics.mean(elapsed), 2) if elapsed else 0.0,
         "first_boundary_normalizations": sum(result.first_boundary_normalized for result in results),
         "summaries_truncated": sum(result.summaries_truncated for result in results),
+        "evidence_citations_trimmed": sum(result.evidence_citations_trimmed for result in results),
         "evidence_overlap_violations": sum(result.evidence_overlap_violations for result in results),
     }
 

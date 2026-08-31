@@ -120,6 +120,7 @@ class OpenRouterEpisodeResult(BaseModel):
     elapsed_seconds: float
     first_boundary_normalized: bool = False
     summaries_truncated: int = 0
+    evidence_citations_trimmed: int = 0
     evidence_overlap_violations: int = 0
     window_count: int = 1
 
@@ -153,6 +154,7 @@ class OpenRouterEpisodeResult(BaseModel):
             "normalizations": {
                 "first_boundary_to_zero": self.first_boundary_normalized,
                 "summaries_truncated": self.summaries_truncated,
+                "evidence_citations_trimmed": self.evidence_citations_trimmed,
             },
             "validation": {"evidence_overlap_violations": self.evidence_overlap_violations},
             "window_count": self.window_count,
@@ -277,6 +279,7 @@ def _parse_response(
         raise invalid("OpenRouter response was not JSON") from exc
     first_boundary_normalized = False
     summaries_truncated = 0
+    evidence_citations_trimmed = 0
     if isinstance(raw_candidate, dict):
         chapters = raw_candidate.get("chapters")
         if isinstance(chapters, list) and chapters and isinstance(chapters[0], dict):
@@ -291,6 +294,10 @@ def _parse_response(
                 if isinstance(summary, str) and len(summary) > 300:
                     chapter["summary"] = summary[:300].rsplit(" ", 1)[0].rstrip(" ,;:-")
                     summaries_truncated += 1
+                evidence = chapter.get("evidence_block_indexes")
+                if isinstance(evidence, list) and len(evidence) > 3:
+                    chapter["evidence_block_indexes"] = list(dict.fromkeys(evidence))[:3]
+                    evidence_citations_trimmed += len(evidence) - len(chapter["evidence_block_indexes"])
     try:
         candidate = EpisodeEnrichmentCandidate.model_validate(raw_candidate)
     except ValidationError as exc:
@@ -324,6 +331,7 @@ def _parse_response(
         elapsed_seconds=elapsed,
         first_boundary_normalized=first_boundary_normalized,
         summaries_truncated=summaries_truncated,
+        evidence_citations_trimmed=evidence_citations_trimmed,
         evidence_overlap_violations=evidence_overlap_violations,
     )
 
@@ -479,6 +487,7 @@ def generate_hierarchical_openrouter_enrichment(
         elapsed_seconds=sum(result.elapsed_seconds for _offset, result in window_results),
         first_boundary_normalized=any(result.first_boundary_normalized for _offset, result in window_results),
         summaries_truncated=sum(result.summaries_truncated for _offset, result in window_results),
+        evidence_citations_trimmed=sum(result.evidence_citations_trimmed for _offset, result in window_results),
         evidence_overlap_violations=sum(result.evidence_overlap_violations for _offset, result in window_results),
         window_count=len(window_results),
     )
