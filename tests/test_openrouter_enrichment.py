@@ -39,6 +39,7 @@ def _response_payload() -> dict:
     content = {
         "subjects": ["Labor organizing", "Housing costs"],
         "keywords": ["union vote", "tenant protections"],
+        "categories": [{"slug": "politics", "evidence_block_indexes": [0, 1]}],
         "chapters": [
             {
                 "start_ms": 0,
@@ -106,6 +107,7 @@ def test_build_openrouter_request_uses_identical_strict_controls():
     }
     user = json.loads(body["messages"][1]["content"])
     assert user["target_chapter_count"] == 6
+    assert user["category_taxonomy"]["politics"] == "Politics"
     assert user["transcript_blocks"][1]["block_index"] == 1
 
 
@@ -200,6 +202,20 @@ def test_generate_openrouter_enrichment_trims_excess_evidence_citations(monkeypa
     assert result.as_dict()["normalizations"]["evidence_citations_trimmed"] == 2
 
 
+def test_generate_openrouter_enrichment_rejects_unknown_category_evidence(monkeypatch):
+    payload = _response_payload()
+    parsed = json.loads(payload["choices"][0]["message"]["content"])
+    parsed["categories"][0]["evidence_block_indexes"] = [99]
+    payload["choices"][0]["message"]["content"] = json.dumps(parsed)
+    monkeypatch.setattr(
+        "app.archive.openrouter_enrichment.request.urlopen",
+        lambda _req, timeout: _Response(payload),
+    )
+
+    with pytest.raises(ValueError, match="category cites an unknown transcript block"):
+        generate_openrouter_episode_enrichment(_episode(), api_key="key", model="model")
+
+
 def test_generate_openrouter_enrichment_retries_transient_http_errors(monkeypatch):
     attempts = 0
 
@@ -259,6 +275,7 @@ def test_hierarchical_enrichment_bounds_windows_and_recombines_episode():
             candidate=EpisodeEnrichmentCandidate(
                 subjects=["Topic"],
                 keywords=["discussion topic"],
+                categories=[{"slug": "politics", "evidence_block_indexes": [window.blocks[0].block_index]}],
                 chapters=[
                     {
                         "start_ms": 0,

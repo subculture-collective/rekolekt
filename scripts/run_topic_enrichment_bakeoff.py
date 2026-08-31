@@ -107,6 +107,7 @@ def _model_metrics(results: list[OpenRouterEpisodeResult], episodes: dict[str, E
     return {
         "episodes_completed": len(results),
         "chapters_total": sum(chapter_counts),
+        "categories_total": sum(len(result.candidate.categories) for result in results),
         "median_chapters_per_episode": statistics.median(chapter_counts) if chapter_counts else 0,
         "median_chapter_minutes": round(statistics.median(durations), 2) if durations else 0.0,
         "subject_lexical_grounding_rate": round(statistics.mean(subject_grounding), 4) if subject_grounding else 0.0,
@@ -160,6 +161,8 @@ def _build_blind_review(
                     f"### {aliases[model]}",
                     "",
                     "Verdict: ____",
+                    "",
+                    f"Categories: {'; '.join(category.slug for category in result.candidate.categories)}",
                     "",
                     f"Subjects: {'; '.join(result.candidate.subjects)}",
                     "",

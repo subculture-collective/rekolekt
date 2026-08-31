@@ -79,7 +79,7 @@ The command builds overlapping two-minute windows with a one-minute stride by de
 
 ## OpenRouter full-episode bake-off
 
-The OpenRouter bake-off evaluates complete enrichment behavior rather than reusing local semantic boundaries. Each model independently chooses chapter starts, titles, subjects, and keywords from the same timestamped transcript packet. The command performs no database writes and does not publish its results.
+The OpenRouter bake-off evaluates complete enrichment behavior rather than reusing local semantic boundaries. Each model independently chooses chapter starts, titles, subjects, keywords, and one to three categories from the fixed archive taxonomy using the same timestamped transcript packet. The command performs no database writes and does not publish its results.
 
 Provide the key only in the command environment, then run:
 
@@ -110,7 +110,7 @@ The blind worksheet is the quality decision. Automated grounding and shape metri
 
 ## Candidate generation with V4 Pro
 
-The production-facing enrichment path is deliberately review-only. It uses the pinned `deepseek/deepseek-v4-pro` model through OpenRouter, divides long episodes into balanced windows no longer than 90 minutes, and merges their chapter timelines and recurring labels. This avoids the oversized tail chapters found in the whole-episode bake-off.
+The production-facing enrichment path is deliberately review-only. It uses the pinned `deepseek/deepseek-v4-pro` model through OpenRouter, divides long episodes into balanced windows no longer than 90 minutes, and merges their chapter timelines and recurring labels. Categories are restricted to the existing archive allowlist and retain cited transcript evidence. This avoids the oversized tail chapters found in the whole-episode bake-off without allowing free-form category growth.
 
 Configure the ignored `.env` file:
 

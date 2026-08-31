@@ -40,6 +40,7 @@ def _result(model: str) -> OpenRouterEpisodeResult:
         candidate=EpisodeEnrichmentCandidate(
             subjects=["Labor organizing", "Housing costs"],
             keywords=["union vote", "tenant protections"],
+            categories=[{"slug": "politics", "evidence_block_indexes": [0]}],
             chapters=[
                 {
                     "start_ms": 0,
@@ -91,6 +92,7 @@ def test_bakeoff_cli_writes_predictions_metrics_and_blind_review(tmp_path, monke
     assert report["observed_cost_usd"] == 0.02
     assert report["blind_model_key"] == {"Model A": "model/one", "Model B": "model/two"}
     assert report["models"]["model/one"]["chapter_evidence_overlap_rate"] == 1.0
+    assert report["models"]["model/one"]["categories_total"] == 1
     assert report["models"]["model/one"]["first_boundary_normalizations"] == 1
     assert report["models"]["model/one"]["summaries_truncated"] == 1
     assert report["models"]["model/one"]["evidence_overlap_violations"] == 0
@@ -99,6 +101,7 @@ def test_bakeoff_cli_writes_predictions_metrics_and_blind_review(tmp_path, monke
     review = (output_dir / "blind-editorial-review.md").read_text()
     assert "model/one" not in review
     assert "Model A" in review
+    assert "Categories: politics" in review
 
 
 def test_bakeoff_cli_resumes_without_api_calls(tmp_path, monkeypatch):
