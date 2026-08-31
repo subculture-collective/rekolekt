@@ -85,6 +85,10 @@ def test_build_openrouter_request_uses_identical_strict_controls():
     assert response_schema["name"] == "hasanara_episode_enrichment"
     assert response_schema["strict"] is True
     assert response_schema["schema"] is not EPISODE_ENRICHMENT_SCHEMA
+    assert response_schema["schema"]["properties"]["chapters"]["minItems"] == 4
+    assert response_schema["schema"]["properties"]["chapters"]["maxItems"] == 8
+    assert EPISODE_ENRICHMENT_SCHEMA["properties"]["chapters"]["minItems"] == 2
+    assert EPISODE_ENRICHMENT_SCHEMA["properties"]["chapters"]["maxItems"] == 40
     evidence_items = response_schema["schema"]["properties"]["chapters"]["items"]["properties"][
         "evidence_block_indexes"
     ]["items"]

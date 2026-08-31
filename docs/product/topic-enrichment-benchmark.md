@@ -95,7 +95,7 @@ The default contenders are pinned to:
 - `deepseek/deepseek-v4-pro`;
 - `deepseek/deepseek-v4-flash`.
 
-The runner uses the same prompt, strict JSON Schema, temperature zero, and disabled reasoning for all contenders. It rotates request order by episode to reduce timing bias, refuses data-collection providers, requires structured-output support, disables provider fallback by default, and stops scheduling new calls once `--max-observed-cost-usd` is reached. OpenRouter's reported provider, token counts, cost, and latency are retained with every episode result.
+The runner uses the same prompt, strict JSON Schema, temperature zero, and disabled reasoning for all contenders. The per-episode schema permits two chapters below or above the duration-derived target, preventing severe over-segmentation while leaving room for editorial structure. It rotates request order by episode to reduce timing bias, refuses data-collection providers, requires structured-output support, disables provider fallback by default, and stops scheduling new calls once `--max-observed-cost-usd` is reached. OpenRouter's reported provider, token counts, cost, and latency are retained with every episode result.
 
 If `OPENROUTER_API_KEY` is not already exported, the command loads it from the repository's ignored `.env` file without shell-sourcing unrelated settings. The parser expands a model's first meaningful chapter back to timestamp zero and records that normalization. Overlong summaries are safely truncated and counted. Evidence citations outside their proposed chapter remain visible as overlap violations in the comparison report; malformed timelines and unknown block citations still reject the result.
 

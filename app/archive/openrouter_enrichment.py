@@ -15,7 +15,7 @@ from .enrichment_runner import EpisodeInput, TranscriptBlockInput
 from .labeling.benchmark import EpisodePrediction, PredictedChapter
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
-PROMPT_VERSION = "archive-episode-enrichment-v2"
+PROMPT_VERSION = "archive-episode-enrichment-v3"
 
 EPISODE_ENRICHMENT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -173,6 +173,9 @@ def build_openrouter_episode_request(
 ) -> dict[str, Any]:
     target_count = _target_chapter_count(episode.duration_ms)
     response_schema = deepcopy(EPISODE_ENRICHMENT_SCHEMA)
+    chapter_schema = response_schema["properties"]["chapters"]
+    chapter_schema["minItems"] = max(2, target_count - 2)
+    chapter_schema["maxItems"] = min(40, target_count + 2)
     evidence_schema = response_schema["properties"]["chapters"]["items"]["properties"]["evidence_block_indexes"][
         "items"
     ]
