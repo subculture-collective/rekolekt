@@ -1,0 +1,16 @@
+[Unit]
+Description=HasanAra ROCm transcription worker on Kvant
+Requires=hasanara-almaz-database.service hasanara-almaz-storage.service
+After=hasanara-almaz-database.service hasanara-almaz-storage.service
+
+[Service]
+ExecStartPre=/usr/bin/python3 /home/onnwee/.local/state/hasanara-kvant/verify-storage.py
+ExecStart=/usr/bin/docker start -a hasanara-kvant-worker
+ExecStop=/usr/bin/docker stop --timeout 600 hasanara-kvant-worker
+Restart=on-failure
+RestartSec=15
+TimeoutStartSec=30
+TimeoutStopSec=620
+
+[Install]
+WantedBy=default.target

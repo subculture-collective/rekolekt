@@ -1,0 +1,13 @@
+[Unit]
+Description=HasanAra shared media directory on Almaz
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/sshfs -f -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,default_permissions almaz:/mnt/spektr/server/projects/hasanara-deploy/data /home/onnwee/.local/state/hasanara-kvant/shared/data
+ExecStop=/usr/bin/fusermount3 -u /home/onnwee/.local/state/hasanara-kvant/shared/data
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

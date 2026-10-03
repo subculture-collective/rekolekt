@@ -1,0 +1,12 @@
+[Unit]
+Description=HasanAra encrypted database connection to Almaz
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ssh -NT -o ControlPath=none -o ControlMaster=no -o ForkAfterAuthentication=no -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L 127.0.0.1:15438:10.0.0.200:15432 almaz
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
