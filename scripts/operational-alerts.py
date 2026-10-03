@@ -93,7 +93,15 @@ def notify(state, failures, opener):
     # Accept the initial list-only state format.
     if isinstance(saved, list):
         saved = {"failures": saved}
+    # Require two matching scheduled observations before changing incident
+    # state. One timeout followed by a healthy run must not send two emails.
+    observations = saved.get("observations", 0) + 1 if saved.get("observed_failures") == failures else 1
+    saved["observed_failures"] = failures
+    saved["observations"] = min(observations, 2)
     pending = saved.get("pending")
+    if pending is None and observations < 2:
+        save_state(state, saved)
+        return None
     kind = transition(saved.get("failures"), failures)
     if pending is None and kind:
         pending = {"kind": kind, "failures": failures, "id": str(uuid.uuid4()), "started": time.time()}
@@ -103,10 +111,11 @@ def notify(state, failures, opener):
         if time.time() - pending["started"] >= 29 * 60:
             raise ValueError("unconfirmed notification requires operator review")
         send_alert(pending["kind"], pending["failures"], opener, pending["id"])
-        saved = {"failures": pending["failures"]}
+        saved["failures"] = pending["failures"]
+        saved.pop("pending", None)
         kind = pending["kind"]
     else:
-        saved = {"failures": failures}
+        saved["failures"] = failures
     save_state(state, saved)
     return kind
 
