@@ -310,3 +310,16 @@ def test_postgres_backend_uses_repository(monkeypatch):
     assert results[0].video_id == "v7"
     assert results[0].snippet == "snip"
     assert results[0].highlights == ({"start": 0, "end": 4},)
+
+
+def test_native_text_and_title_matches_preserve_deduplication_and_filters(db_session):
+    db_session.execute(text("CREATE TEMP TABLE videos (id text, title text, uploaded_at timestamptz, duration_seconds int, channel_name text, category text, language text) ON COMMIT DROP"))
+    db_session.execute(text("CREATE TEMP TABLE segments (id bigint, video_id text, start_ms int, end_ms int, text text, text_tsv tsvector, speaker_label text) ON COMMIT DROP"))
+    db_session.execute(text("INSERT INTO videos (id,title,channel_name) VALUES ('v1','climate title','wanted'), ('v2','other','excluded')"))
+    db_session.execute(text("INSERT INTO segments VALUES (1,'v1',0,1000,'climate text',to_tsvector('english','climate text'),NULL), (2,'v1',1000,2000,'title only',to_tsvector('english','title only'),NULL), (3,'v2',0,1000,'climate text',to_tsvector('english','climate text'),NULL)"))
+    repo = SearchRepository()
+    rows = repo.search_native(db_session, "climate", filters={"channel": "wanted"})
+    assert {row["id"] for row in rows} == {1, 2}
+    assert len(rows) == 2
+    assert repo.search_native(db_session, "absentneedle") == []
+    assert len(repo.search_native(db_session, "climate", limit=1, offset=1, filters={"channel": "wanted"})) == 1

@@ -63,7 +63,7 @@ class SearchRepository:
         text_match, highlighted_text, text_rank, title_match = _match_expressions("s", q, filters, params)
 
         # Search transcript text and video title so newly processed videos are discoverable.
-        where_clauses = [f"({text_match} OR {title_match})"]
+        where_clauses = ["true"]
 
         if video_id:
             where_clauses.append("s.video_id = :vid")
@@ -128,12 +128,34 @@ class SearchRepository:
         if needs_video_join:
             from_clause = "segments s JOIN videos v ON s.video_id = v.id"
 
+        # Keep the text and title branches disjoint so GIN lookup remains usable
+        # without fetching every matching row a second time. Generate snippets
+        # only after pagination, since ts_headline reads the full transcript text.
+        candidate_fields = (
+            "s.id, s.video_id, s.start_ms, s.end_ms, "
+            f"{text_rank} AS rank, "
+            f"CASE WHEN {title_match} THEN 1 ELSE 0 END AS title_match, "
+            "v.uploaded_at, v.duration_seconds"
+        )
+        page_order = order_by.replace("v.", "").replace("s.", "")
         sql = f"""
+            WITH native_hits AS (
+                SELECT {candidate_fields} FROM {from_clause}
+                WHERE {text_match} AND {' AND '.join(where_clauses)}
+                UNION ALL
+                SELECT {candidate_fields} FROM {from_clause}
+                WHERE {title_match} AND ({text_match}) IS NOT TRUE
+                  AND {' AND '.join(where_clauses)}
+            ), native_page AS MATERIALIZED (
+                SELECT * FROM native_hits
+                ORDER BY {page_order}
+                LIMIT :limit OFFSET :offset
+            )
             SELECT {select_fields}
-            FROM {from_clause}
-            WHERE {' AND '.join(where_clauses)}
+            FROM native_page page
+            JOIN segments s ON s.id = page.id
+            JOIN videos v ON s.video_id = v.id
             ORDER BY {order_by}
-            LIMIT :limit OFFSET :offset
         """
 
         rows = db.execute(text(sql), params).mappings().all()
