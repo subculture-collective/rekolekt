@@ -708,6 +708,52 @@ CREATE TABLE community_reports (
     UNIQUE(post_id, reporter_id)
 );
 CREATE INDEX community_reports_queue ON community_reports(status, created_at);
+
+-- Speaker identification keeps who set a mapping or enrolled a voice.
+CREATE TABLE IF NOT EXISTS archive_people (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    aliases JSONB NOT NULL DEFAULT '[]'::jsonb,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'published',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    default_role TEXT,
+    CONSTRAINT archive_people_default_role_check
+        CHECK (default_role IS NULL OR default_role IN ('guest', 'host', 'caller', 'subject', 'mentioned'))
+);
+CREATE INDEX IF NOT EXISTS ix_archive_people_status ON archive_people(status);
+CREATE TABLE video_speaker_people (
+    video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    speaker_label TEXT NOT NULL,
+    person_id UUID REFERENCES archive_people(id) ON DELETE CASCADE,
+    method TEXT NOT NULL,
+    score DOUBLE PRECISION,
+    set_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    set_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    invalidated_at TIMESTAMPTZ,
+    invalidated_reason TEXT,
+    PRIMARY KEY (video_id, speaker_label),
+    CONSTRAINT video_speaker_people_method_check CHECK (method IN ('manual', 'auto')),
+    CONSTRAINT video_speaker_people_auto_person_check CHECK (method = 'manual' OR person_id IS NOT NULL)
+);
+CREATE INDEX video_speaker_people_active_person_idx ON video_speaker_people (person_id) WHERE invalidated_at IS NULL;
+CREATE TABLE speaker_voice_references (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    person_id UUID NOT NULL REFERENCES archive_people(id) ON DELETE CASCADE,
+    video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    speaker_label TEXT NOT NULL,
+    segment_ids BIGINT[] NOT NULL,
+    embedding REAL[] NOT NULL,
+    model TEXT NOT NULL,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT speaker_voice_references_unique UNIQUE (person_id, video_id, speaker_label),
+    CONSTRAINT speaker_voice_references_segments_nonempty CHECK (cardinality(segment_ids) > 0)
+);
+CREATE INDEX speaker_voice_references_person_idx ON speaker_voice_references (person_id);
 CREATE TABLE chat_imports (
     video_id UUID PRIMARY KEY REFERENCES videos(id) ON DELETE CASCADE,
     source_format TEXT NOT NULL CHECK (source_format IN ('twitchdownloader', 'rustlog')),
@@ -730,3 +776,29 @@ CREATE TABLE chat_messages (
     metadata JSONB
 );
 CREATE INDEX chat_messages_video_offset ON chat_messages (video_id, offset_ms, id);
+CREATE TABLE segment_corrections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    source TEXT NOT NULL CHECK (source IN ('whisper','youtube')),
+    start_ms INTEGER NOT NULL CHECK (start_ms >= 0),
+    end_ms INTEGER NOT NULL CHECK (end_ms >= start_ms),
+    original_sha256 TEXT NOT NULL CHECK (original_sha256 ~ '^[0-9a-f]{64}$'),
+    original_text TEXT NOT NULL,
+    corrected_text TEXT NOT NULL CHECK (length(btrim(corrected_text)) BETWEEN 1 AND 2000),
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending','accepted','rejected','stale','superseded')),
+    proposer_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    reviewer_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    review_reason TEXT CHECK (review_reason IS NULL OR length(btrim(review_reason)) BETWEEN 1 AND 1000),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reviewed_at TIMESTAMPTZ,
+    accepted_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (status <> 'accepted' OR accepted_at IS NOT NULL)
+);
+CREATE UNIQUE INDEX segment_corrections_one_applied
+    ON segment_corrections(video_id, source, start_ms, end_ms) WHERE status = 'accepted';
+CREATE INDEX segment_corrections_by_video ON segment_corrections(video_id, source, start_ms);
+CREATE INDEX segment_corrections_queue ON segment_corrections(status, created_at)
+    WHERE status IN ('pending','stale');
+CREATE INDEX segment_corrections_proposer ON segment_corrections(proposer_id, created_at DESC);

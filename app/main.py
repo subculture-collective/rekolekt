@@ -348,12 +348,14 @@ from .routes.community import router as community_router  # noqa: E402
 from .routes.passages import router as passages_router  # noqa: E402
 from .routes.podcast import router as podcast_router  # noqa: E402
 from .routes.site import router as site_router  # noqa: E402
+from .routes.speakers import router as speakers_router  # noqa: E402
 
 app.include_router(atproto_router)
 app.include_router(chat_router)
 app.include_router(clips_router)
 app.include_router(community_router)
 app.include_router(site_router)
+app.include_router(speakers_router)
 app.include_router(passages_router)
 app.include_router(podcast_router)
 app.include_router(videos_router)
@@ -365,6 +367,10 @@ app.include_router(analytics_router)
 app.include_router(search_router)
 app.include_router(support_router)
 app.include_router(vocabularies_router)
+if settings.TRANSCRIPT_CORRECTIONS_ENABLED:
+    from .routes.corrections import router as corrections_router  # noqa: E402
+
+    app.include_router(corrections_router)
 
 
 @app.get(

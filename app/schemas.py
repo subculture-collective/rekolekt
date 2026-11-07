@@ -142,6 +142,13 @@ class AnalyticsEventBatchInput(BaseModel):
     events: List[AnalyticsEventInput] = Field(min_length=1, max_length=50)
 
 
+class SpeakerPerson(BaseModel):
+    """The archive person a diarized speaker label is attributed to."""
+
+    slug: str = Field(..., description="Archive person slug")
+    display_name: str = Field(..., description="Archive person display name")
+
+
 class Segment(BaseModel):
     """A single segment of transcribed text with timing information."""
 
@@ -149,6 +156,11 @@ class Segment(BaseModel):
     end_ms: int = Field(..., description="End time in milliseconds", ge=0)
     text: str = Field(..., description="Transcribed text content")
     speaker_label: Optional[str] = Field(None, description="Speaker label from diarization (e.g., 'Speaker 1')")
+    speaker_person: Optional[SpeakerPerson] = Field(
+        default=None,
+        description="Archive person the speaker label is attributed to; omitted when no person is mapped",
+        exclude_if=lambda value: value is None,
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -189,6 +201,19 @@ WORD_TIMINGS_NOTE_DESCRIPTION = (
 )
 
 
+class CorrectionMark(BaseModel):
+    """A segment range showing an accepted user correction instead of the machine text."""
+
+    start_ms: int = Field(..., description="Start of the corrected segment in milliseconds")
+    end_ms: int = Field(..., description="End of the corrected segment in milliseconds")
+    machine_text: str = Field(..., description="The machine transcript text this correction replaced")
+
+
+CORRECTIONS_FIELD_DESCRIPTION = (
+    "Segments whose text is an accepted correction, with the original machine text. " "Empty for merged transcripts."
+)
+
+
 class TranscriptResponse(BaseModel):
     """Complete transcript for a video with all segments."""
 
@@ -198,6 +223,7 @@ class TranscriptResponse(BaseModel):
         "whisper", description="Transcript source used for this response"
     )
     source_label: str = Field("Whisper transcript", description="Human-readable transcript source label")
+    corrections: List[CorrectionMark] = Field(default_factory=list, description=CORRECTIONS_FIELD_DESCRIPTION)
 
     model_config = {
         "json_schema_extra": {
@@ -243,6 +269,7 @@ class YouTubeTranscriptResponse(BaseModel):
     blocks: List["TranscriptBlockResponse"] = Field(default_factory=list, description="Formatted caption blocks")
     source: Literal["youtube"] = Field("youtube", description="Transcript source used for this response")
     source_label: str = Field("YouTube captions", description="Human-readable transcript source label")
+    corrections: List[CorrectionMark] = Field(default_factory=list, description=CORRECTIONS_FIELD_DESCRIPTION)
 
 
 class HighlightRange(BaseModel):
@@ -1244,6 +1271,11 @@ class CleanedSegment(BaseModel):
     text_raw: str = Field(..., description="Original text before cleanup")
     text_cleaned: str = Field(..., description="Text after cleanup applied")
     speaker_label: Optional[str] = Field(None, description="Speaker label from diarization")
+    speaker_person: Optional[SpeakerPerson] = Field(
+        default=None,
+        description="Archive person the speaker label is attributed to; omitted when no person is mapped",
+        exclude_if=lambda value: value is None,
+    )
     sentence_boundary: bool = Field(False, description="True if this segment ends a sentence")
     likely_hallucination: bool = Field(False, description="True if detected as potential hallucination")
 
@@ -1280,6 +1312,7 @@ class CleanedTranscriptResponse(BaseModel):
     segments: List[CleanedSegment] = Field(..., description="Cleaned transcript segments")
     cleanup_config: CleanupConfig = Field(..., description="Cleanup configuration used")
     stats: CleanupStats = Field(..., description="Statistics about cleanup operations")
+    corrections: List[CorrectionMark] = Field(default_factory=list, description=CORRECTIONS_FIELD_DESCRIPTION)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Timestamp of cleanup")
 
     model_config = {
@@ -1310,6 +1343,11 @@ class TranscriptBlockResponse(BaseModel):
     start_ms: int = Field(..., description="Start time in milliseconds", ge=0)
     end_ms: int = Field(..., description="End time in milliseconds", ge=0)
     speaker_label: Optional[str] = Field(None, description="Speaker label for the block")
+    speaker_person: Optional[SpeakerPerson] = Field(
+        default=None,
+        description="Archive person the speaker label is attributed to; omitted when no person is mapped",
+        exclude_if=lambda value: value is None,
+    )
     text: str = Field(..., description="Formatted block text")
     segment_ids: List[int] = Field(..., description="Source segment indices included in the block")
     kind: Literal["paragraph", "speaker_turn"] = Field(..., description="Block kind")
@@ -1365,6 +1403,7 @@ class FormattedTranscriptResponse(BaseModel):
         "whisper", description="Transcript source used for this response"
     )
     source_label: str = Field("Whisper transcript", description="Human-readable transcript source label")
+    corrections: List[CorrectionMark] = Field(default_factory=list, description=CORRECTIONS_FIELD_DESCRIPTION)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), description="Timestamp of formatting"
     )
@@ -1376,3 +1415,80 @@ class WordTimedFormattedTranscriptResponse(FormattedTranscriptResponse):
     segments: List[WordTimedSegment] = Field(..., description="Raw transcript segments with word timings")  # type: ignore[assignment]
     word_timings: Literal["available", "partial", "unavailable"] = Field(..., description=WORD_TIMINGS_DESCRIPTION)
     word_timings_note: Optional[WordTimingsNote] = Field(None, description=WORD_TIMINGS_NOTE_DESCRIPTION)
+
+
+class SpeakerSample(BaseModel):
+    id: int = Field(..., description="Segment id")
+    start_ms: int = Field(..., ge=0)
+    end_ms: int = Field(..., ge=0)
+    text: str
+
+
+class SpeakerMappingAdmin(BaseModel):
+    person_slug: Optional[str] = Field(None, description="Mapped person; null when an administrator cleared the label")
+    person_display_name: Optional[str] = None
+    method: Literal["manual", "auto"]
+    score: Optional[float] = Field(None, description="Cosine similarity for automatic matches")
+    set_by: Optional[uuid.UUID] = Field(None, description="Administrator who set it; null for automatic matches")
+    set_at: datetime
+    status: Literal["active", "cleared", "stale"] = Field(
+        ..., description="stale after the recording's labels changed (reprocessing or rediarization)"
+    )
+    invalidated_at: Optional[datetime] = None
+    invalidated_reason: Optional[str] = None
+
+
+class SpeakerSuggestion(BaseModel):
+    slug: str
+    display_name: str
+    score: float = Field(..., description="Cosine similarity with the person's closest enrolled voice")
+
+
+class VideoSpeakerAdmin(BaseModel):
+    speaker_label: str
+    segment_count: int
+    speech_seconds: Optional[float] = Field(None, description="Speaking time from the stored voice embedding")
+    has_embedding: bool = Field(..., description="True when diarization stored a voice embedding for the label")
+    samples: List[SpeakerSample]
+    mapping: Optional[SpeakerMappingAdmin] = None
+    suggestion: Optional[SpeakerSuggestion] = Field(
+        None, description="Best enrolled voice, excluding references taken from this recording"
+    )
+
+
+class VideoSpeakerAdminListResponse(BaseModel):
+    video_id: uuid.UUID
+    items: List[VideoSpeakerAdmin]
+
+
+class SpeakerMappingUpdate(BaseModel):
+    person_slug: str = Field(..., min_length=1, max_length=200)
+    enroll: bool = Field(False, description="Also enroll the label's voice as a reference for the person")
+
+
+class SpeakerMappingResult(BaseModel):
+    video_id: uuid.UUID
+    speaker_label: str
+    person: Optional[SpeakerPerson] = None
+    reindexed_segments: int
+
+
+class SpeakerVoiceReferenceCreate(BaseModel):
+    video_id: uuid.UUID
+    speaker_label: str = Field(..., min_length=1, max_length=200)
+    segment_ids: List[int] = Field(..., min_length=1, max_length=50, description="Confirmed segments of this voice")
+
+
+class SpeakerVoiceReference(BaseModel):
+    id: uuid.UUID
+    video_id: uuid.UUID
+    speaker_label: str
+    segment_ids: List[int]
+    model: str
+    created_by: Optional[uuid.UUID] = None
+    created_at: datetime
+
+
+class SpeakerVoiceReferenceListResponse(BaseModel):
+    person_slug: str
+    items: List[SpeakerVoiceReference]

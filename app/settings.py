@@ -161,6 +161,7 @@ class Settings(BaseSettings):
     SITE_NAME: str = Field(default="Transcript Archive", min_length=1, max_length=80)
     SITE_CREATOR_NAME: str = Field(default="the creators", min_length=1, max_length=100)
     COMMUNITY_ENABLED: bool = False
+    TRANSCRIPT_CORRECTIONS_ENABLED: bool = False
     CLIP_EXPORTS_ENABLED: bool = False
     # Serve imported chat logs at GET /videos/{video_id}/chat.
     CHAT_REPLAY_ENABLED: bool = False
@@ -316,6 +317,11 @@ class Settings(BaseSettings):
     # explicit allow-list, processes at most that many, then exits.
     DIARIZATION_BACKLOG_MODE: bool = False
     DIARIZATION_BACKLOG_BATCH_SIZE: int = Field(default=10, ge=1, le=100)
+    # Automatic speaker identification compares each recording's speaker
+    # embeddings with enrolled voices. Writes stay off until the threshold has
+    # been chosen with scripts/evaluate_speaker_matching.py.
+    SPEAKER_AUTO_MATCH_ENABLED: bool = False
+    SPEAKER_MATCH_THRESHOLD: float = Field(default=0.75, ge=0.0, le=1.0)
     # Custom vocabulary post-processing
     ENABLE_CUSTOM_VOCABULARY: bool = True  # Apply custom vocabulary corrections
     # Translation support
