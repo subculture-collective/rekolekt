@@ -140,8 +140,13 @@ covers the database.
 
 ## Contributing
 
-Open a pull request on GitHub against `main`. CI runs `make verify` on every
-pull request and it must pass before merge. Read
+Report bugs and request features in
+[GitHub issues](https://github.com/subculture-collective/rekolekt/issues). Ask
+questions and share ideas in
+[GitHub Discussions](https://github.com/subculture-collective/rekolekt/discussions).
+
+Send code as a pull request on GitHub against `main`. CI runs `make verify` on
+every pull request and it must pass before merge. Read
 [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md)
 and the [security policy](docs/SECURITY.md). Commit messages follow
 Conventional Commits.
